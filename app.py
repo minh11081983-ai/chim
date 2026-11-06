@@ -1,155 +1,238 @@
 import streamlit as st
-import pygame
-import random
-import numpy as np
-from PIL import Image
-import time
+import streamlit.components.v1 as components
 
-# Cấu hình trang Streamlit
-st.set_page_config(page_title="Flappy Bird Streamlit", page_icon="🐦", layout="centered")
+st.set_page_config(
+    page_title="Flappy Bird Streamlit", page_icon="🐦", layout="centered"
+)
 
-st.title("🐦 Flappy Bird (Streamlit Edition)")
-st.caption("Nhấn nút 'Bay lên!' hoặc 'Bắt đầu' để chơi.")
+st.title("🐦 Flappy Bird Game")
+st.caption(
+    "Nhấn nút **Bay lên** bên dưới hoặc phím **SPACE** (Khoảng trống) trên bàn"
+    " phím để điều khiển chim!"
+)
 
-# Kích thước màn hình game
-SCREEN_WIDTH = 400
-SCREEN_HEIGHT = 600
-GRAVITY = 0.4
-FLAP_STRENGTH = -7
-PIPE_SPEED = 4
-PIPE_GAP = 160
+# Mã nguồn HTML, CSS và JavaScript của game Flappy Bird
+game_html = """
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #70c5ce;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            font-family: sans-serif;
+        }
+        canvas {
+            border: 2px solid #000;
+            background-color: #70c5ce;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+        }
+        .btn-container {
+            margin-top: 15px;
+        }
+        .jump-btn {
+            background-color: #ff9800;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px #e65100;
+        }
+        .jump-btn:active {
+            box-shadow: 0 2px #e65100;
+            transform: translateY(2px);
+        }
+    </style>
+</head>
+<body>
 
-# Khởi tạo trạng thái ứng dụng (Session State)
-if "game_running" not in st.session_state:
-    st.session_state.game_running = False
-if "score" not in st.session_state:
-    st.session_state.score = 0
-if "high_score" not in st.session_state:
-    st.session_state.high_score = 0
-if "bird_y" not in st.session_state:
-    st.session_state.bird_y = SCREEN_HEIGHT // 2
-if "bird_velocity" not in st.session_state:
-    st.session_state.bird_velocity = 0
-if "pipes" not in st.session_state:
-    st.session_state.pipes = []
-if "last_pipe" not in st.session_state:
-    st.session_state.last_pipe = time.time()
-
-def reset_game():
-    st.session_state.bird_y = SCREEN_HEIGHT // 2
-    st.session_state.bird_velocity = 0
-    st.session_state.pipes = []
-    st.session_state.score = 0
-    st.session_state.game_running = True
-    st.session_state.last_pipe = time.time()
-
-def flap():
-    if st.session_state.game_running:
-        st.session_state.bird_velocity = FLAP_STRENGTH
-
-# Giao diện điều khiển nút bấm
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("🚀 Bắt đầu / Chơi lại", use_container_width=True):
-        reset_game()
-with col2:
-    if st.button("🪽 Bay lên!", use_container_width=True):
-        flap()
-
-# Khai báo khung hiển thị hình ảnh game và điểm số
-game_image_place = st.empty()
-score_place = st.empty()
-
-# Khởi tạo Pygame ở chế độ không mở cửa sổ (Headless)
-pygame.init()
-surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-
-# Vòng lặp cập nhật Game
-if st.session_state.game_running:
-    # 1. Cập nhật vị trí Chim
-    st.session_state.bird_velocity += GRAVITY
-    st.session_state.bird_y += st.session_state.bird_velocity
-
-    # 2. Tạo Cột mới
-    current_time = time.time()
-    if current_time - st.session_state.last_pipe > 1.4:
-        top_height = random.randint(60, SCREEN_HEIGHT - PIPE_GAP - 120)
-        st.session_state.pipes.append({
-            "x": SCREEN_WIDTH,
-            "top": top_height,
-            "bottom": top_height + PIPE_GAP,
-            "passed": False
-        })
-        st.session_state.last_pipe = current_time
-
-    # 3. Cập nhật Cột & Tính điểm
-    new_pipes = []
-    for pipe in st.session_state.pipes:
-        pipe["x"] -= PIPE_SPEED
-        if pipe["x"] + 60 > 0:
-            new_pipes.append(pipe)
-        
-        if not pipe["passed"] and pipe["x"] < 100:
-            st.session_state.score += 1
-            pipe["passed"] = True
-            if st.session_state.score > st.session_state.high_score:
-                st.session_state.high_score = st.session_state.score
-
-    st.session_state.pipes = new_pipes
-
-    # 4. Kiểm tra Va chạm
-    bird_rect = pygame.Rect(100, int(st.session_state.bird_y), 30, 30)
+    <canvas id="canvas" width="320" height="480"></canvas>
     
-    # Chạm trần hoặc sàn
-    if st.session_state.bird_y <= 0 or st.session_state.bird_y >= SCREEN_HEIGHT - 30:
-        st.session_state.game_running = False
+    <div class="btn-container">
+        <button class="jump-btn" onclick="flap()">BAY LÊN 🚀</button>
+    </div>
 
-    # Chạm cột
-    for pipe in st.session_state.pipes:
-        top_pipe_rect = pygame.Rect(pipe["x"], 0, 60, pipe["top"])
-        bottom_pipe_rect = pygame.Rect(pipe["x"], pipe["bottom"], 60, SCREEN_HEIGHT - pipe["bottom"])
-        if bird_rect.colliderect(top_pipe_rect) or bird_rect.colliderect(bottom_pipe_rect):
-            st.session_state.game_running = False
+    <script>
+        const cvs = document.getElementById("canvas");
+        const ctx = cvs.getContext("2d");
 
-    # 5. Vẽ Game lên Pygame Surface
-    surface.fill((135, 206, 235))  # Nền trời xanh
+        // Biến điều khiển game
+        let birdX = 50;
+        let birdY = 150;
+        let gravity = 0.35;
+        let velocity = 0;
+        let jump = -6.5;
+        let score = 0;
+        let gameOver = false;
 
-    # Vẽ Chim
-    pygame.draw.circle(surface, (255, 255, 0), (115, int(st.session_state.bird_y) + 15), 15)
+        const pipeWidth = 50;
+        const pipeGap = 125;
+        let pipes = [];
 
-    # Vẽ Cột
-    for pipe in st.session_state.pipes:
-        pygame.draw.rect(surface, (34, 139, 34), (pipe["x"], 0, 60, pipe["top"]))
-        pygame.draw.rect(surface, (34, 139, 34), (pipe["x"], pipe["bottom"], 60, SCREEN_HEIGHT - pipe["bottom"]))
+        // Thêm cột ban đầu
+        pipes[0] = {
+            x: cvs.width,
+            top: Math.floor(Math.random() * (cvs.height - pipeGap - 100)) + 30
+        };
 
-    # Chuyển đổi Pygame Surface thành Image để Streamlit hiển thị
-    img_data = pygame.surfarray.array3d(surface)
-    img_data = np.transpose(img_data, (1, 0, 2))
-    img = Image.fromarray(img_data)
-    
-    game_image_place.image(img, use_column_width=True)
-    score_place.markdown(f"### 🏆 Điểm hiện tại: **{st.session_state.score}** | 🥇 Kỷ lục: **{st.session_state.high_score}**")
-    
-    # Tạm dừng ngắn để tạo khung hình mượt mà và tự động gọi lại app
-    time.sleep(0.025)
-    st.rerun()
+        // Bắt sự kiện bàn phím (Phím Space)
+        document.addEventListener("keydown", function(e) {
+            if (e.code === "Space") {
+                flap();
+            }
+        });
 
-else:
-    # Hiển thị màn hình chờ / Kết thúc
-    surface.fill((135, 206, 235))
-    pygame.draw.circle(surface, (255, 255, 0), (115, SCREEN_HEIGHT // 2), 15)
-    
-    # Vẽ các cột mẫu nền
-    pygame.draw.rect(surface, (34, 139, 34), (250, 0, 60, 200))
-    pygame.draw.rect(surface, (34, 139, 34), (250, 360, 60, 240))
+        function flap() {
+            if (gameOver) {
+                resetGame();
+            } else {
+                velocity = jump;
+            }
+        }
 
-    img_data = pygame.surfarray.array3d(surface)
-    img_data = np.transpose(img_data, (1, 0, 2))
-    img = Image.fromarray(img_data)
-    
-    game_image_place.image(img, use_column_width=True)
-    
-    if st.session_state.score > 0:
-        score_place.markdown(f"### 💥 Thua rồi! Điểm của bạn: **{st.session_state.score}** | 🥇 Kỷ lục: **{st.session_state.high_score}**")
-    else:
-        score_place.markdown(f"### 🎮 Bấm **🚀 Bắt đầu / Chơi lại** để bắt đầu! | 🥇 Kỷ lục: **{st.session_state.high_score}**")
+        function resetGame() {
+            birdY = 150;
+            velocity = 0;
+            score = 0;
+            pipes = [];
+            pipes[0] = {
+                x: cvs.width,
+                top: Math.floor(Math.random() * (cvs.height - pipeGap - 100)) + 30
+            };
+            gameOver = false;
+            draw();
+        }
+
+        function draw() {
+            // 1. Nền bầu trời
+            ctx.fillStyle = "#70c5ce";
+            ctx.fillRect(0, 0, cvs.width, cvs.height);
+
+            // 2. Vẽ các cột ống
+            for (let i = 0; i < pipes.length; i++) {
+                ctx.fillStyle = "#73bf2e";
+                ctx.strokeStyle = "#53801b";
+                ctx.lineWidth = 2;
+
+                // Ống trên
+                ctx.fillRect(pipes[i].x, 0, pipeWidth, pipes[i].top);
+                ctx.strokeRect(pipes[i].x, 0, pipeWidth, pipes[i].top);
+
+                // Ống dưới
+                let bottomPipeY = pipes[i].top + pipeGap;
+                let bottomPipeHeight = cvs.height - bottomPipeY - 20;
+                ctx.fillRect(pipes[i].x, bottomPipeY, pipeWidth, bottomPipeHeight);
+                ctx.strokeRect(pipes[i].x, bottomPipeY, pipeWidth, bottomPipeHeight);
+
+                // Di chuyển cột sang trái
+                if (!gameOver) {
+                    pipes[i].x -= 2;
+                }
+
+                // Thêm cột mới khi cột cũ sang giữa màn hình
+                if (pipes[i].x === 140) {
+                    pipes.push({
+                        x: cvs.width,
+                        top: Math.floor(Math.random() * (cvs.height - pipeGap - 100)) + 30
+                    });
+                }
+
+                // Xử lý va chạm
+                if (birdX + 15 > pipes[i].x && birdX - 15 < pipes[i].x + pipeWidth) {
+                    if (birdY - 15 < pipes[i].top || birdY + 15 > bottomPipeY) {
+                        gameOver = true;
+                    }
+                }
+
+                // Tăng điểm khi vượt qua cột
+                if (pipes[i].x === 48 && !gameOver) {
+                    score++;
+                }
+            }
+
+            // Xóa các cột đã đi ra khỏi màn hình
+            if (pipes.length > 0 && pipes[0].x < -pipeWidth) {
+                pipes.shift();
+            }
+
+            // 3. Mặt đất
+            ctx.fillStyle = "#ded895";
+            ctx.fillRect(0, cvs.height - 20, cvs.width, 20);
+            ctx.fillStyle = "#73bf2e";
+            ctx.fillRect(0, cvs.height - 20, cvs.width, 4);
+
+            // 4. Chim (Flappy Bird)
+            ctx.beginPath();
+            ctx.arc(birdX, birdY, 13, 0, Math.PI * 2);
+            ctx.fillStyle = "#f4c430";
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#000";
+            ctx.stroke();
+
+            // Mắt chim
+            ctx.beginPath();
+            ctx.arc(birdX + 5, birdY - 4, 3, 0, Math.PI * 2);
+            ctx.fillStyle = "#fff";
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(birdX + 6, birdY - 4, 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = "#000";
+            ctx.fill();
+
+            // Mỏ chim
+            ctx.fillStyle = "#ff5722";
+            ctx.fillRect(birdX + 8, birdY, 8, 5);
+
+            // 5. Cập nhật trọng lực chim
+            if (!gameOver) {
+                velocity += gravity;
+                birdY += velocity;
+            }
+
+            // Kiểm tra chạm sàn hoặc trần
+            if (birdY + 13 >= cvs.height - 20 || birdY - 13 <= 0) {
+                gameOver = true;
+            }
+
+            // 6. Hiển thị Điểm số
+            ctx.fillStyle = "#FFF";
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 3;
+            ctx.font = "bold 35px sans-serif";
+            ctx.strokeText(score, cvs.width / 2 - 10, 50);
+            ctx.fillText(score, cvs.width / 2 - 10, 50);
+
+            // 7. Màn hình Game Over
+            if (gameOver) {
+                ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+                ctx.fillRect(0, 0, cvs.width, cvs.height);
+
+                ctx.fillStyle = "#FFF";
+                ctx.font = "bold 26px sans-serif";
+                ctx.textAlign = "center";
+                ctx.fillText("GAME OVER", cvs.width / 2, cvs.height / 2 - 10);
+                
+                ctx.font = "16px sans-serif";
+                ctx.fillText("Bấm BAY LÊN để chơi lại", cvs.width / 2, cvs.height / 2 + 25);
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    </script>
+</body>
+</html>
+"""
+
+# Nhúng game HTML vào ứng dụng Streamlit
+components.html(game_html, height=580)
