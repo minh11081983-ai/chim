@@ -9,15 +9,15 @@ import time
 st.set_page_config(page_title="Flappy Bird Streamlit", page_icon="🐦", layout="centered")
 
 st.title("🐦 Flappy Bird (Streamlit Edition)")
-st.caption("Nhấn nút 'Bay lên!' hoặc phím Cắt (Space) / phím Mũi tên lên trên giao diện để chơi.")
+st.caption("Nhấn nút 'Bay lên!' hoặc 'Bắt đầu' để chơi.")
 
 # Kích thước màn hình game
 SCREEN_WIDTH = 400
 SCREEN_HEIGHT = 600
-GRAVITY = 0.25
-FLAP_STRENGTH = -6.5
-PIPE_SPEED = 3
-PIPE_GAP = 150
+GRAVITY = 0.4
+FLAP_STRENGTH = -7
+PIPE_SPEED = 4
+PIPE_GAP = 160
 
 # Khởi tạo trạng thái ứng dụng (Session State)
 if "game_running" not in st.session_state:
@@ -47,7 +47,7 @@ def flap():
     if st.session_state.game_running:
         st.session_state.bird_velocity = FLAP_STRENGTH
 
-# Giao diện điều khiển
+# Giao diện điều khiển nút bấm
 col1, col2 = st.columns(2)
 with col1:
     if st.button("🚀 Bắt đầu / Chơi lại", use_container_width=True):
@@ -56,7 +56,7 @@ with col2:
     if st.button("🪽 Bay lên!", use_container_width=True):
         flap()
 
-# Khai báo khung hiển thị hình ảnh game
+# Khai báo khung hiển thị hình ảnh game và điểm số
 game_image_place = st.empty()
 score_place = st.empty()
 
@@ -72,8 +72,8 @@ if st.session_state.game_running:
 
     # 2. Tạo Cột mới
     current_time = time.time()
-    if current_time - st.session_state.last_pipe > 1.5:
-        top_height = random.randint(50, SCREEN_HEIGHT - PIPE_GAP - 100)
+    if current_time - st.session_state.last_pipe > 1.4:
+        top_height = random.randint(60, SCREEN_HEIGHT - PIPE_GAP - 120)
         st.session_state.pipes.append({
             "x": SCREEN_WIDTH,
             "top": top_height,
@@ -130,17 +130,26 @@ if st.session_state.game_running:
     game_image_place.image(img, use_column_width=True)
     score_place.markdown(f"### 🏆 Điểm hiện tại: **{st.session_state.score}** | 🥇 Kỷ lục: **{st.session_state.high_score}**")
     
-    # Rerender liên tục để tạo hiệu ứng chuyển động
-    time.sleep(0.03)
+    # Tạm dừng ngắn để tạo khung hình mượt mà và tự động gọi lại app
+    time.sleep(0.025)
     st.rerun()
 
 else:
     # Hiển thị màn hình chờ / Kết thúc
     surface.fill((135, 206, 235))
     pygame.draw.circle(surface, (255, 255, 0), (115, SCREEN_HEIGHT // 2), 15)
+    
+    # Vẽ các cột mẫu nền
+    pygame.draw.rect(surface, (34, 139, 34), (250, 0, 60, 200))
+    pygame.draw.rect(surface, (34, 139, 34), (250, 360, 60, 240))
+
     img_data = pygame.surfarray.array3d(surface)
     img_data = np.transpose(img_data, (1, 0, 2))
     img = Image.fromarray(img_data)
     
     game_image_place.image(img, use_column_width=True)
-    score_place.markdown(f"### 🎮 Bấm **🚀 Bắt đầu** để chơi! | 🥇 Kỷ lục: **{st.session_state.high_score}**")
+    
+    if st.session_state.score > 0:
+        score_place.markdown(f"### 💥 Thua rồi! Điểm của bạn: **{st.session_state.score}** | 🥇 Kỷ lục: **{st.session_state.high_score}**")
+    else:
+        score_place.markdown(f"### 🎮 Bấm **🚀 Bắt đầu / Chơi lại** để bắt đầu! | 🥇 Kỷ lục: **{st.session_state.high_score}**")
